@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Producción - Fábrica de Bolsas</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyan: {
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            900: '#164e63',
+                        },
+                        emerald: {
+                            400: '#34d399',
+                            500: '#10b981',
+                        },
+                        darkBg: '#0b1329',
+                        darkCard: '#111c38',
+                        darkBorder: '#1e2d54'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0b1329;
+            color: #f1f5f9;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #111c38;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #1e2d54;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #06b6d4;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#0b1329] text-slate-100">
+
+    <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
+    <header class="border-b border-[#1e2d54] bg-[#111c38] sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-gradient-to-tr from-cyan-500 to-emerald-400 rounded-lg text-slate-900 font-bold">
+                    <i class="fa-solid fa-industry text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wider text-slate-100">PROD<span class="text-cyan-400">TRACK</span></h1>
+                    <p class="text-xs text-slate-400">Control de Producción de Bolsas Plásticas</p>
+                </div>
+            </div>
+
+            <!-- Menú de Pestañas -->
+            <nav class="flex items-center gap-2 bg-[#0b1329] p-1 rounded-lg border border-[#1e2d54]">
+                <button onclick="switchTab('scan')" id="tab-scan" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/40">
+                    <i class="fa-solid fa-camera"></i> Escanear / Cargar
+                </button>
+                <button onclick="switchTab('grouped')" id="tab-grouped" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium transition text-slate-400 hover:text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-[#06b6d4] fa-layer-group"></i> Por Especificación
+                </button>
+                <button onclick="switchTab('list')" id="tab-list" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium transition text-slate-400 hover:text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-list-check"></i> Histórico
+                </button>
+                <button onclick="switchTab('catalog')" id="tab-catalog" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium transition text-slate-400 hover:text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-book"></i> Catálogo
+                </button>
+            </nav>
+
+            <!-- Configuración API Key -->
+            <button onclick="openApiKeyModal()" class="px-3 py-1.5 text-xs rounded-md bg-[#1e2d54] text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2 border border-slate-600/50">
+                <i class="fa-solid fa-key text-cyan-400"></i> API Key Gemini
+            </button>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+        <!-- PESTAÑA 1: ESCANEAR / CARGAR -->
+        <section id="sec-scan" class="tab-content block">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Columna Izquierda: Carga de Imagen y Escaneo -->
+                <div class="lg:col-cols-5 space-y-4">
+                    <div class="bg-[#111c38] p-5 rounded-xl border border-[#1e2d54]">
+                        <h2 class="text-lg font-semibold text-cyan-400 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-file-arrow-up"></i> Carga de Etiqueta
+                        </h2>
+                        
+                        <div class="border-2 border-dashed border-[#1e2d54] hover:border-cyan-500/50 transition rounded-xl p-4 text-center bg-[#0b1329]/50 flex flex-col items-center justify-center min-h-[220px] relative">
+                            <input type="file" id="imageInput" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onchange="handleImageSelect(event)">
+                            
+                            <div id="uploadPlaceholder" class="space-y-2">
+                                <i class="fa-solid fa-cloud-arrow-up text-4xl text-cyan-400/80 mb-2"></i>
+                                <p class="text-sm text-slate-300 font-medium">Saca una foto o arrastra una imagen</p>
+                                <p class="text-xs text-slate-500">Formatos soportados: JPG, PNG, WEBP</p>
+                            </div>
+
+                            <img id="imagePreview" class="hidden max-h-[260px] rounded-lg object-contain shadow-lg border border-[#1e2d54]" src="" alt="Vista previa de etiqueta">
+                        </div>
+
+                        <div class="mt-4 flex gap-2">
+                            <button onclick="processImageWithAI()" id="btnProcessAI" disabled class="flex-1 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold py-2.5 px-4 rounded-lg transition flex items-center justify-center gap-2 text-sm shadow-lg shadow-cyan-500/10">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Analizar con IA (Gemini)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Leyenda / Guía rápida -->
+                    <div class="bg-[#111c38]/60 p-4 rounded-xl border border-[#1e2d54] text-xs text-slate-400 space-y-2">
+                        <div class="text-slate-200 font-semibold flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-info text-cyan-400"></i> Lectura Automática
+                        </div>
+                        <p>La Inteligencia Artificial extraerá automáticamente el proveedor, fecha de materia prima, código del producto, fecha de producción, peso, rollos y número de lote independientemente de cómo estén distribuidos en la etiqueta.</p>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Formulario de Confirmación -->
+                <div class="lg:col-span-7">
+                    <div class="bg-[#111c38] p-5 rounded-xl border border-[#1e2d54] space-y-4">
+                        <div class="flex justify-between items-center border-b border-[#1e2d54] pb-3">
+                            <h2 class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                                <i class="fa-solid fa-pen-to-square text-cyan-400"></i> Datos de Producción
+                            </h2>
+                            <span id="aiBadge" class="hidden text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                <i class="fa-solid fa-robot"></i> Rellenado por IA
+                            </span>
+                        </div>
+
+                        <form id="prodForm" onsubmit="saveEntry(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Materia Prima - Proveedor</label>
+                                    <input type="text" id="formProvider" placeholder="Ej: OXI" required class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Fecha Ingreso Materia Prima</label>
+                                    <input type="text" id="formProviderDate" placeholder="Ej: 07/10" class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Código Impreso Especificación</label>
+                                    <input type="text" id="formSpecCode" placeholder="Ej: 60R, 60RB" oninput="updateSpecMatchNotice()" required class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 uppercase font-mono">
+                                    <div id="specMatchNotice" class="mt-1 text-xs"></div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Máquina N°</label>
+                                    <select id="formMachine" class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                                        <option value="1">Máquina 1</option>
+                                        <option value="2">Máquina 2</option>
+                                        <option value="3">Máquina 3</option>
+                                        <option value="4">Máquina 4</option>
+                                        <option value="5">Máquina 5</option>
+                                        <option value="6">Máquina 6</option>
+                                        <option value="7">Máquina 7</option>
+                                        <option value="8">Máquina 8</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Fecha de Producción</label>
+                                    <input type="date" id="formProdDate" required class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Peso (KG)</label>
+                                    <input type="number" step="0.1" id="formWeight" placeholder="Ej: 542" required class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Cantidad (Rollos)</label>
+                                    <input type="number" id="formRolls" placeholder="Ej: 1800" required class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Número de Lote / Pallet</label>
+                                <input type="text" id="formBatch" placeholder="Ej: 087" required class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 font-mono">
+                            </div>
+
+                            <div class="pt-2">
+                                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 px-4 rounded-lg transition flex items-center justify-center gap-2 text-sm shadow-lg shadow-emerald-500/10">
+                                    <i class="fa-solid fa-floppy-disk"></i> Guardar Registro de Producción
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PESTAÑA 2: AGRUPADO POR ESPECIFICACIÓN -->
+        <section id="sec-grouped" class="tab-content hidden space-y-6">
+            <!-- Filtros de búsqueda -->
+            <div class="bg-[#111c38] p-4 rounded-xl border border-[#1e2d54] flex flex-wrap gap-4 items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-medium text-slate-300">Filtrar por Fecha:</span>
+                    <select id="groupDateFilter" onchange="renderGroupedView()" class="bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-1.5 text-xs text-slate-200">
+                        <option value="all">Todo el Registro</option>
+                        <option value="today">Hoy</option>
+                        <option value="month">Este Mes</option>
+                    </select>
+                </div>
+                <div class="text-xs text-slate-400">
+                    <span id="groupedTotalCount" class="text-cyan-400 font-bold">0</span> códigos en pantalla
+                </div>
+            </div>
+
+            <!-- Grilla de Tarjetas Agrupadas -->
+            <div id="groupedContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- Se rellena dinámicamente -->
+            </div>
+        </section>
+
+        <!-- PESTAÑA 3: HISTÓRICO Y TABLA COMPLETA -->
+        <section id="sec-list" class="tab-content hidden space-y-6">
+            <!-- Tarjetas Resumen (KPIs) -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-[#111c38] p-4 rounded-xl border border-[#1e2d54] space-y-1">
+                    <p class="text-xs text-slate-400">Total Producido (KG)</p>
+                    <p class="text-2xl font-bold text-cyan-400" id="kpiWeight">0 kg</p>
+                </div>
+                <div class="bg-[#111c38] p-4 rounded-xl border border-[#1e2d54] space-y-1">
+                    <p class="text-xs text-slate-400">Total Rollos</p>
+                    <p class="text-2xl font-bold text-emerald-400" id="kpiRolls">0</p>
+                </div>
+                <div class="bg-[#111c38] p-4 rounded-xl border border-[#1e2d54] space-y-1">
+                    <p class="text-xs text-slate-400">Lotes / Pallets</p>
+                    <p class="text-2xl font-bold text-amber-400" id="kpiLots">0</p>
+                </div>
+                <div class="bg-[#111c38] p-4 rounded-xl border border-[#1e2d54] space-y-1">
+                    <p class="text-xs text-slate-400">Promedio KG / Pallet</p>
+                    <p class="text-2xl font-bold text-slate-200" id="kpiAvgWeight">0 kg</p>
+                </div>
+            </div>
+
+            <!-- Tabla de Registros -->
+            <div class="bg-[#111c38] rounded-xl border border-[#1e2d54] overflow-hidden">
+                <div class="p-4 border-b border-[#1e2d54] flex flex-wrap justify-between items-center gap-4">
+                    <h3 class="font-semibold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-table text-cyan-400"></i> Listado de Pallets Producidos
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="exportToCSV()" class="px-3 py-1.5 text-xs bg-[#1e2d54] hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-600/50 flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-csv text-emerald-400"></i> Exportar CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-[#0b1329] text-xs text-slate-400 uppercase border-b border-[#1e2d54]">
+                            <tr>
+                                <th class="p-3">Foto</th>
+                                <th class="p-3">Lote</th>
+                                <th class="p-3">Código</th>
+                                <th class="p-3">Descripción Producto</th>
+                                <th class="p-3">Fecha Prod.</th>
+                                <th class="p-3">Máquina</th>
+                                <th class="p-3">Materia Prima</th>
+                                <th class="p-3">Peso</th>
+                                <th class="p-3">Rollos</th>
+                                <th class="p-3 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="divide-y divide-[#1e2d54]">
+                            <!-- Relleno por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- PESTAÑA 4: CATÁLOGO DE PRODUCTOS -->
+        <section id="sec-catalog" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- Formulario Agregar / Editar Catálogo -->
+                <div class="md:col-span-5 bg-[#111c38] p-5 rounded-xl border border-[#1e2d54] space-y-4 h-fit">
+                    <h2 class="text-lg font-semibold text-cyan-400 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle"></i> Crear / Editar Producto
+                    </h2>
+
+                    <form id="catalogForm" onsubmit="saveCatalogItem(event)" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Código de Impresión</label>
+                            <input type="text" id="catCode" placeholder="Ej: 60RB" required class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 uppercase font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Descripción del Producto</label>
+                            <input type="text" id="catDesc" placeholder="Ej: 60 x 90 Rollo Verde" required class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Color / Variante</label>
+                            <select id="catColor" class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                                <option value="Negro">Negro</option>
+                                <option value="Verde">Verde</option>
+                                <option value="Azul">Azul</option>
+                                <option value="Transparente">Transparente</option>
+                                <option value="Amarillo">Amarillo</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-2.5 px-4 rounded-lg transition text-sm">
+                            Guardar en Catálogo
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Lista del Catálogo -->
+                <div class="md:col-span-7 bg-[#111c38] p-5 rounded-xl border border-[#1e2d54] space-y-4">
+                    <h2 class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-list text-cyan-400"></i> Catálogo Actual
+                    </h2>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-300">
+                            <thead class="bg-[#0b1329] text-xs text-slate-400 uppercase border-b border-[#1e2d54]">
+                                <tr>
+                                    <th class="p-2.5">Código</th>
+                                    <th class="p-2.5">Descripción Mapeada</th>
+                                    <th class="p-2.5">Color</th>
+                                    <th class="p-2.5 text-right">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="catalogTableBody" class="divide-y divide-[#1e2d54]">
+                                <!-- Relleno por JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL CLAVE API GEMINI -->
+    <div id="apiKeyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#111c38] border border-[#1e2d54] rounded-xl p-6 max-w-md w-full space-y-4">
+            <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-key text-cyan-400"></i> Configurar Clave API Gemini
+            </h3>
+            <p class="text-xs text-slate-400">Para procesar automáticamente las etiquetas mediante visión por Inteligencia Artificial, ingresa tu API Key de Google Gemini.</p>
+            <div>
+                <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="w-full bg-[#0b1329] border border-[#1e2d54] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 font-mono">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeApiKeyModal()" class="px-4 py-2 text-xs bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg">Cancelar</button>
+                <button onclick="saveApiKey()" class="px-4 py-2 text-xs bg-cyan-500 text-slate-950 font-bold hover:bg-cyan-400 rounded-lg">Guardar Clave</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE LA APLICACIÓN -->
+    <script>
+        // --- ESTADO Y DATOS ---
+        let currentImageData = null;
+
+        // Catálogo de Códigos de Especificación
+        let catalog = JSON.parse(localStorage.getItem('prod_catalog')) || {
+            '60R': { description: '60 x 90 Rollo Negro', color: 'Negro' },
+            '60RB': { description: '60 x 90 Rollo Verde', color: 'Verde' },
+            '50R': { description: '50 x 70 Rollo Negro', color: 'Negro' }
+        };
+
+        // Histórico de Registros de Producción
+        let records = JSON.parse(localStorage.getItem('prod_records')) || [
+            {
+                id: '1',
+                provider: 'OXI',
+                providerDate: '07/10',
+                specCode: '60R',
+                machine: '1',
+                prodDate: '2026-10-21',
+                weight: 542,
+                rolls: 1800,
+                batch: '087',
+                image: ''
+            }
+        ];
+
+        // Inicialización al cargar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            renderCatalog();
+            renderHistoryTable();
+            renderGroupedView();
+            updateKPIs();
+            // Poner fecha de hoy por defecto en el formulario
+            document.getElementById('formProdDate').value = new Date().toISOString().split('T')[0];
+        });
+
+        // NAVEGACIÓN ENTRE PESTAÑAS
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-cyan-500/20', 'text-cyan-400', 'border', 'border-cyan-500/40');
+                btn.classList.add('text-slate-400');
+            });
+
+            document.getElementById(`sec-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.classList.add('bg-cyan-500/20', 'text-cyan-400', 'border', 'border-cyan-500/40');
+            activeBtn.classList.remove('text-slate-400');
+
+            if (tabId === 'grouped') renderGroupedView();
+            if (tabId === 'list') {
+                renderHistoryTable();
+                updateKPIs();
+            }
+        }
+
+        // CONTROL DE IMAGEN
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentImageData = e.target.result;
+                const imgPreview = document.getElementById('imagePreview');
+                imgPreview.src = currentImageData;
+                imgPreview.classList.remove('hidden');
+                document.getElementById('uploadPlaceholder').classList.add('hidden');
+                document.getElementById('btnProcessAI').disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ANALIZAR ETIQUETA CON GEMINI API
+        async function processImageWithAI() {
+            const apiKey = localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                alert('Por favor configura tu API Key de Gemini desde el botón superior.');
+                openApiKeyModal();
+                return;
+            }
+
+            if (!currentImageData) return;
+
+            const btn = document.getElementById('btnProcessAI');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando Etiqueta...';
+
+            try {
+                const base64Data = currentImageData.split(',')[1];
+                const promptText = `Analiza esta imagen de una etiqueta de producción industrial de bolsas plásticas. Extrae los siguientes campos en formato JSON estricto:
+                - provider: Texto del proveedor en la parte superior (ej: "OXI")
+                - providerDate: Fecha escrita al lado del proveedor (ej: "07/10")
+                - specCode: Código de especificación en texto impreso (ej: "60 R" o "60RB", devuélvelo sin espacios intermedios)
+                - weight: Número decimal del PESO en KG (ej: 542)
+                - rolls: Número de la CANTIDAD de rollos (ej: 1800)
+                - batch: Número del LOTE (ej: "087")
+                - prodDate: Fecha de producción en formato AAAA-MM-DD si es visible, de lo contrario deja cadena vacía.
+                Responde ÚNICAMENTE con el objeto JSON sintácticamente válido.`;
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: promptText },
+                                { inline_data: { mime_type: "image/jpeg", data: base64Data } }
+                            ]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const rawText = data.candidates[0].content.parts[0].text;
+                const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                const parsed = JSON.parse(cleanJson);
+
+                // Autorellenar formulario
+                if (parsed.provider) document.getElementById('formProvider').value = parsed.provider;
+                if (parsed.providerDate) document.getElementById('formProviderDate').value = parsed.providerDate;
+                if (parsed.specCode) document.getElementById('formSpecCode').value = parsed.specCode.replace(/\s+/g, '');
+                if (parsed.weight) document.getElementById('formWeight').value = parsed.weight;
+                if (parsed.rolls) document.getElementById('formRolls').value = parsed.rolls;
+                if (parsed.batch) document.getElementById('formBatch').value = parsed.batch;
+                if (parsed.prodDate) document.getElementById('formProdDate').value = parsed.prodDate;
+
+                document.getElementById('aiBadge').classList.remove('hidden');
+                updateSpecMatchNotice();
+
+            } catch (err) {
+                console.error(err);
+                alert('No se pudo analizar la etiqueta. Verifica tu API Key o revisa los datos manualmente.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Analizar con IA (Gemini)';
+            }
+        }
+
+        function updateSpecMatchNotice() {
+            const code = document.getElementById('formSpecCode').value.trim().toUpperCase();
+            const noticeEl = document.getElementById('specMatchNotice');
+
+            if (!code) {
+                noticeEl.innerHTML = '';
+                return;
+            }
+
+            if (catalog[code]) {
+                noticeEl.innerHTML = `<span class="text-emerald-400"><i class="fa-solid fa-check-circle"></i> ${catalog[code].description} (${catalog[code].color})</span>`;
+            } else {
+                noticeEl.innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-triangle-exclamation"></i> Código sin catálogo guardado. Podrás asignarle descripción desde la pestaña Catálogo.</span>`;
+            }
+        }
+
+        // GUARDAR REGISTRO DE PRODUCCIÓN
+        function saveEntry(e) {
+            e.preventDefault();
+
+            const specCode = document.getElementById('formSpecCode').value.trim().toUpperCase();
+
+            const newRecord = {
+                id: Date.now().toString(),
+                provider: document.getElementById('formProvider').value.trim(),
+                providerDate: document.getElementById('formProviderDate').value.trim(),
+                specCode: specCode,
+                machine: document.getElementById('formMachine').value,
+                prodDate: document.getElementById('formProdDate').value,
+                weight: parseFloat(document.getElementById('formWeight').value) || 0,
+                rolls: parseInt(document.getElementById('formRolls').value) || 0,
+                batch: document.getElementById('formBatch').value.trim(),
+                image: currentImageData || ''
+            };
+
+            records.unshift(newRecord);
+            localStorage.setItem('prod_records', JSON.stringify(records));
+
+            // Si el código no está en el catálogo, agregarlo genérico
+            if (!catalog[specCode]) {
+                catalog[specCode] = { description: `${specCode} (Sin Catálogo)`, color: 'Otro' };
+                localStorage.setItem('prod_catalog', JSON.stringify(catalog));
+                renderCatalog();
+            }
+
+            alert('¡Registro de producción guardado correctamente!');
+            document.getElementById('prodForm').reset();
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('uploadPlaceholder').classList.remove('hidden');
+            document.getElementById('aiBadge').classList.add('hidden');
+            document.getElementById('specMatchNotice').innerHTML = '';
+            currentImageData = null;
+
+            switchTab('grouped');
+        }
+
+        // VISTA AGRUPADA POR ESPECIFICACIÓN
+        function renderGroupedView() {
+            const container = document.getElementById('groupedContainer');
+            const filter = document.getElementById('groupDateFilter').value;
+            container.innerHTML = '';
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const currentMonthStr = todayStr.substring(0, 7);
+
+            // Filtrar registros
+            let filteredRecords = records.filter(r => {
+                if (filter === 'today') return r.prodDate === todayStr;
+                if (filter === 'month') return r.prodDate.startsWith(currentMonthStr);
+                return true;
+            });
+
+            // Agrupar por specCode
+            const groups = {};
+            filteredRecords.forEach(r => {
+                if (!groups[r.specCode]) {
+                    groups[r.specCode] = {
+                        specCode: r.specCode,
+                        totalWeight: 0,
+                        totalRolls: 0,
+                        items: []
+                    };
+                }
+                groups[r.specCode].totalWeight += r.weight;
+                groups[r.specCode].totalRolls += r.rolls;
+                groups[r.specCode].items.push(r);
+            });
+
+            const keys = Object.keys(groups);
+            document.getElementById('groupedTotalCount').innerText = keys.length;
+
+            if (keys.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500">No hay registros para mostrar en el período seleccionado.</div>`;
+                return;
+            }
+
+            keys.forEach(code => {
+                const g = groups[code];
+                const catItem = catalog[code] || { description: 'Sin catálogo asignado', color: 'Otro' };
+                const avgKg = (g.totalWeight / g.items.length).toFixed(1);
+
+                const cardHtml = `
+                    <div class="bg-[#111c38] border border-[#1e2d54] rounded-xl overflow-hidden flex flex-col justify-between shadow-md">
+                        <div class="p-4 space-y-3">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-xl font-bold font-mono text-cyan-400">${g.specCode}</span>
+                                    <h4 class="text-sm font-semibold text-slate-200 mt-0.5">${catItem.description}</h4>
+                                </div>
+                                <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-[#1e2d54] text-slate-300 border border-slate-600/50">
+                                    ${catItem.color}
+                                </span>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-2 pt-2 border-t border-[#1e2d54]/60 text-center">
+                                <div class="bg-[#0b1329] p-2 rounded-lg">
+                                    <p class="text-[10px] text-slate-400">Total KG</p>
+                                    <p class="text-sm font-bold text-cyan-400">${g.totalWeight} kg</p>
+                                </div>
+                                <div class="bg-[#0b1329] p-2 rounded-lg">
+                                    <p class="text-[10px] text-slate-400">Total Rollos</p>
+                                    <p class="text-sm font-bold text-emerald-400">${g.totalRolls}</p>
+                                </div>
+                                <div class="bg-[#0b1329] p-2 rounded-lg">
+                                    <p class="text-[10px] text-slate-400">Pallets</p>
+                                    <p class="text-sm font-bold text-amber-400">${g.items.length}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Desglose de Lotes -->
+                        <div class="bg-[#0b1329]/50 p-3 border-t border-[#1e2d54] space-y-2">
+                            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Últimos Lotes Integrados:</p>
+                            <div class="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar">
+                                ${g.items.map(item => `
+                                    <div class="flex justify-between items-center text-xs bg-[#111c38] p-2 rounded border border-[#1e2d54]">
+                                        <div>
+                                            <span class="font-mono font-bold text-slate-200">Lote ${item.batch}</span>
+                                            <span class="text-slate-500 text-[10px]">(${item.prodDate})</span>
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="text-cyan-400 font-semibold">${item.weight} kg</span> / 
+                                            <span class="text-emerald-400">${item.rolls} r.</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHtml;
+            });
+        }
+
+        // TABLA HISTÓRICA Y KPIS
+        function renderHistoryTable() {
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '';
+
+            records.forEach(r => {
+                const catDesc = catalog[r.specCode]?.description || `<span class="text-amber-400 text-xs">Sin Catálogo</span>`;
+                const imgThumb = r.image 
+                    ? `<img src="${r.image}" class="w-9 h-9 rounded object-cover border border-[#1e2d54]">` 
+                    : `<div class="w-9 h-9 bg-[#0b1329] rounded flex items-center justify-center text-slate-600 text-xs"><i class="fa-solid fa-image"></i></div>`;
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-[#1a284c]/50 transition';
+                tr.innerHTML = `
+                    <td class="p-3">${imgThumb}</td>
+                    <td class="p-3 font-mono font-bold text-slate-100">${r.batch}</td>
+                    <td class="p-3 font-mono text-cyan-400 font-semibold">${r.specCode}</td>
+                    <td class="p-3">${catDesc}</td>
+                    <td class="p-3 text-xs text-slate-300">${r.prodDate}</td>
+                    <td class="p-3 text-xs">Máq. ${r.machine}</td>
+                    <td class="p-3 text-xs">${r.provider} (${r.providerDate})</td>
+                    <td class="p-3 font-bold text-cyan-400">${r.weight} kg</td>
+                    <td class="p-3 font-semibold text-emerald-400">${r.rolls}</td>
+                    <td class="p-3 text-right">
+                        <button onclick="deleteRecord('${r.id}')" class="text-xs text-red-400 hover:text-red-300 p-1.5 rounded bg-red-500/10 hover:bg-red-500/20">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateKPIs() {
+            const totalW = records.reduce((acc, r) => acc + r.weight, 0);
+            const totalR = records.reduce((acc, r) => acc + r.rolls, 0);
+            const totalL = records.length;
+            const avgW = totalL > 0 ? (totalW / totalL).toFixed(1) : 0;
+
+            document.getElementById('kpiWeight').innerText = `${totalW} kg`;
+            document.getElementById('kpiRolls').innerText = totalR;
+            document.getElementById('kpiLots').innerText = totalL;
+            document.getElementById('kpiAvgWeight').innerText = `${avgW} kg`;
+        }
+
+        function deleteRecord(id) {
+            if (!confirm('¿Seguro que deseas eliminar este registro de producción?')) return;
+            records = records.filter(r => r.id !== id);
+            localStorage.setItem('prod_records', JSON.stringify(records));
+            renderHistoryTable();
+            updateKPIs();
+        }
+
+        // GESTIÓN DEL CATÁLOGO
+        function renderCatalog() {
+            const tbody = document.getElementById('catalogTableBody');
+            tbody.innerHTML = '';
+
+            Object.keys(catalog).forEach(code => {
+                const item = catalog[code];
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-2.5 font-mono font-bold text-cyan-400">${code}</td>
+                    <td class="p-2.5 text-slate-200">${item.description}</td>
+                    <td class="p-2.5 text-xs text-slate-400">${item.color}</td>
+                    <td class="p-2.5 text-right">
+                        <button onclick="editCatalogItem('${code}')" class="text-xs text-cyan-400 hover:text-cyan-300 mr-2">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button onclick="deleteCatalogItem('${code}')" class="text-xs text-red-400 hover:text-red-300">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function saveCatalogItem(e) {
+            e.preventDefault();
+            const code = document.getElementById('catCode').value.trim().toUpperCase();
+            const description = document.getElementById('catDesc').value.trim();
+            const color = document.getElementById('catColor').value;
+
+            catalog[code] = { description, color };
+            localStorage.setItem('prod_catalog', JSON.stringify(catalog));
+
+            document.getElementById('catalogForm').reset();
+            renderCatalog();
+            renderHistoryTable();
+            alert('Producto guardado en el catálogo.');
+        }
+
+        function editCatalogItem(code) {
+            document.getElementById('catCode').value = code;
+            document.getElementById('catDesc').value = catalog[code].description;
+            document.getElementById('catColor').value = catalog[code].color;
+        }
+
+        function deleteCatalogItem(code) {
+            if (!confirm(`¿Eliminar ${code} del catálogo?`)) return;
+            delete catalog[code];
+            localStorage.setItem('prod_catalog', JSON.stringify(catalog));
+            renderCatalog();
+        }
+
+        // MODAL CLAVE API
+        function openApiKeyModal() {
+            document.getElementById('apiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
+            document.getElementById('apiKeyModal').classList.remove('hidden');
+        }
+
+        function closeApiKeyModal() {
+            document.getElementById('apiKeyModal').classList.add('hidden');
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            localStorage.setItem('gemini_api_key', key);
+            closeApiKeyModal();
+            alert('Clave API guardada correctamente.');
+        }
+
+        // EXPORTAR A CSV
+        function exportToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Lote,Codigo,Descripcion,FechaProduccion,Maquina,Proveedor,FechaProveedor,PesoKG,Rollos\n";
+
+            records.forEach(r => {
+                const desc = (catalog[r.specCode]?.description || '').replace(/,/g, '');
+                csvContent += `${r.batch},${r.specCode},${desc},${r.prodDate},${r.machine},${r.provider},${r.providerDate},${r.weight},${r.rolls}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Produccion_Bolsas_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
